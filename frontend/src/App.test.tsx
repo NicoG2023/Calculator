@@ -30,4 +30,25 @@ describe('App theme', () => {
     })
     expect(window.localStorage.getItem(themeStorageKey)).toBe('light')
   })
+
+  it('uses the light theme by default and toggles to dark', async () => {
+    const user = userEvent.setup()
+
+    render(<App />)
+
+    await waitFor(() => {
+      expect(document.documentElement).toHaveAttribute('data-theme', 'light')
+    })
+    expect(window.localStorage.getItem(themeStorageKey)).toBe('light')
+
+    await user.click(
+      screen.getByRole('button', { name: 'Switch to dark mode' }),
+    )
+
+    await waitFor(() => {
+      expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    })
+    expect(window.localStorage.getItem(themeStorageKey)).toBe('dark')
+  })
+
 })

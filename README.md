@@ -280,6 +280,25 @@ Frontend tests focus on observable behavior: API integration, server errors, adv
 
 Coverage percentage is not used as a target by itself. Tests are added for meaningful behavior and edge cases rather than to force 100% coverage.
 
+### Coverage Reports
+
+Pre-generated HTML coverage reports are included for both application layers:
+
+- [Backend coverage report](./backend-coverage.html)
+- [Frontend coverage report](./frontend-coverage/index.html)
+
+Current coverage summary:
+
+| Layer | Statements / Coverage | Branches | Functions | Lines |
+| --- | ---: | ---: | ---: | ---: |
+| Backend | 90.8% | — | — | — |
+| Frontend | 90.78% | 84.75% | 100% | 95.50% |
+
+The backend domain and HTTP API packages both achieve 100% coverage.
+The frontend API service also achieves 100% coverage across statements, branches, functions, and lines.
+
+Coverage reports can be regenerated using the testing commands described above.
+
 ## Architecture
 
 ![](image/image.png)

@@ -76,4 +76,13 @@ describe('calculate', () => {
       calculate({ operation: 'add', a: 10, b: 5 }),
     ).rejects.toEqual(new CalculatorApiError('Invalid response from server'))
   })
+
+  it('uses a fallback message when an error response has no error field', async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ message: 'bad request' }, false))
+
+    await expect(
+      calculate({ operation: 'add', a: 10, b: 5 }),
+    ).rejects.toEqual(new CalculatorApiError('Calculation failed'))
+  })
+
 })

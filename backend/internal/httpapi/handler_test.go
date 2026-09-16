@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -187,6 +188,26 @@ func TestHealth(t *testing.T) {
 	if body.Status != "ok" {
 		t.Fatalf("status body = %q, want ok", body.Status)
 	}
+}
+
+func TestHealthRejectsUnsupportedMethod(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/health", nil)
+	response := httptest.NewRecorder()
+
+	NewHandler().ServeHTTP(response, request)
+
+	assertErrorResponse(t, response, http.StatusMethodNotAllowed, "method not allowed")
+	if got := response.Header().Get("Allow"); got != http.MethodGet {
+		t.Fatalf("Allow = %q, want %q", got, http.MethodGet)
+	}
+}
+
+func TestHandleCalculatorErrorDefaultsToInternalServerError(t *testing.T) {
+	response := httptest.NewRecorder()
+
+	handleCalculatorError(response, errors.New("unexpected error"))
+
+	assertErrorResponse(t, response, http.StatusInternalServerError, "internal server error")
 }
 
 func TestCORSPreflight(t *testing.T) {

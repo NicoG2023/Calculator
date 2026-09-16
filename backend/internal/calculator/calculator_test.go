@@ -40,6 +40,13 @@ func TestCalculateDivisionByZero(t *testing.T) {
 	}
 }
 
+func TestCalculateResultOutOfRange(t *testing.T) {
+	_, err := Calculate("add", 1e308, 1e308)
+	if !errors.Is(err, ErrResultOutOfRange) {
+		t.Fatalf("Calculate() error = %v, want %v", err, ErrResultOutOfRange)
+	}
+}
+
 func TestCalculateUnsupportedOperation(t *testing.T) {
 	_, err := Calculate("modulo", 10, 3)
 	if !errors.Is(err, ErrUnsupportedOperation) {

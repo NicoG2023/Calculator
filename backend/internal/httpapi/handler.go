@@ -48,7 +48,7 @@ func calculateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := calculator.Calculate(request.Operation, *request.A, *request.B)
+	result, err := calculator.Calculate(request.Operation, *request.A, request.B)
 	if err != nil {
 		handleCalculatorError(w, err)
 		return
@@ -86,8 +86,6 @@ func decodeCalculateRequest(r *http.Request) (calculateRequest, error) {
 		return calculateRequest{}, errors.New("operation is required")
 	case request.A == nil:
 		return calculateRequest{}, errors.New("a is required")
-	case request.B == nil:
-		return calculateRequest{}, errors.New("b is required")
 	default:
 		return request, nil
 	}
@@ -95,7 +93,10 @@ func decodeCalculateRequest(r *http.Request) (calculateRequest, error) {
 
 func handleCalculatorError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, calculator.ErrSecondOperandRequired):
+		writeError(w, http.StatusBadRequest, "b is required")
 	case errors.Is(err, calculator.ErrDivisionByZero),
+		errors.Is(err, calculator.ErrNegativeSquareRoot),
 		errors.Is(err, calculator.ErrResultOutOfRange),
 		errors.Is(err, calculator.ErrUnsupportedOperation):
 		writeError(w, http.StatusBadRequest, err.Error())

@@ -40,6 +40,25 @@ describe('calculate', () => {
     )
   })
 
+
+
+  it('sends unary operations without a second operand', async () => {
+    fetchMock.mockResolvedValueOnce(mockResponse({ result: 9 }))
+
+    await expect(calculate({ operation: 'sqrt', a: 81 })).resolves.toBe(9)
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:8080/api/v1/calculate',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ operation: 'sqrt', a: 81 }),
+      },
+    )
+  })
+
   it('keeps the error message returned by the backend', async () => {
     fetchMock.mockResolvedValueOnce(
       mockResponse({ error: 'division by zero' }, false),

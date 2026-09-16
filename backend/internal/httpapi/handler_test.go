@@ -9,28 +9,55 @@ import (
 )
 
 func TestCalculateSuccess(t *testing.T) {
-	request := httptest.NewRequest(http.MethodPost, "/api/v1/calculate", strings.NewReader(`{
-		"operation": "add",
-		"a": 10,
-		"b": 5
-	}`))
-	response := httptest.NewRecorder()
-
-	NewHandler().ServeHTTP(response, request)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	tests := []struct {
+		name       string
+		body       string
+		wantResult float64
+	}{
+		{
+			name:       "addition",
+			body:       `{"operation":"add","a":10,"b":5}`,
+			wantResult: 15,
+		},
+		{
+			name:       "exponentiation",
+			body:       `{"operation":"power","a":2,"b":8}`,
+			wantResult: 256,
+		},
+		{
+			name:       "square root without second operand",
+			body:       `{"operation":"sqrt","a":81}`,
+			wantResult: 9,
+		},
+		{
+			name:       "percentage without second operand",
+			body:       `{"operation":"percentage","a":25}`,
+			wantResult: 0.25,
+		},
 	}
-	if got := response.Header().Get("Content-Type"); got != "application/json" {
-		t.Fatalf("Content-Type = %q, want application/json", got)
-	}
 
-	var body calculateResponse
-	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if body.Result != 15 {
-		t.Fatalf("result = %v, want 15", body.Result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, "/api/v1/calculate", strings.NewReader(tt.body))
+			response := httptest.NewRecorder()
+
+			NewHandler().ServeHTTP(response, request)
+
+			if response.Code != http.StatusOK {
+				t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+			}
+			if got := response.Header().Get("Content-Type"); got != "application/json" {
+				t.Fatalf("Content-Type = %q, want application/json", got)
+			}
+
+			var body calculateResponse
+			if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if body.Result != tt.wantResult {
+				t.Fatalf("result = %v, want %v", body.Result, tt.wantResult)
+			}
+		})
 	}
 }
 
@@ -60,7 +87,7 @@ func TestCalculateValidationErrors(t *testing.T) {
 			wantError:  "a is required",
 		},
 		{
-			name:       "missing second operand",
+			name:       "missing second operand for binary operation",
 			body:       `{"operation":"add","a":10}`,
 			wantStatus: http.StatusBadRequest,
 			wantError:  "b is required",
@@ -103,13 +130,18 @@ func TestCalculateDomainErrors(t *testing.T) {
 			wantError: "division by zero",
 		},
 		{
+			name:      "negative square root",
+			body:      `{"operation":"sqrt","a":-1}`,
+			wantError: "square root of a negative number",
+		},
+		{
 			name:      "unsupported operation",
 			body:      `{"operation":"modulo","a":10,"b":3}`,
 			wantError: `unsupported operation: "modulo"`,
 		},
 		{
 			name:      "result outside float64 range",
-			body:      `{"operation":"add","a":1e308,"b":1e308}`,
+			body:      `{"operation":"power","a":1e308,"b":2}`,
 			wantError: "result out of range",
 		},
 	}

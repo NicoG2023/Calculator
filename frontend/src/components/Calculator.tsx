@@ -1,17 +1,18 @@
 import { type ChangeEvent, type FormEvent, useState } from 'react'
 import { calculate, CalculatorApiError } from '../services/calculatorApi'
-import type { Operation } from '../types/calculator'
+import type { BinaryOperation, UnaryOperation } from '../types/calculator'
 
 interface CalculatorProps {
   theme: 'light' | 'dark'
   onToggleTheme: () => void
 }
 
-const operationSymbols: Record<Operation, string> = {
+const operationSymbols: Record<BinaryOperation, string> = {
   add: '+',
   subtract: '−',
   multiply: '×',
   divide: '÷',
+  power: '^',
 }
 
 const partialNumberPattern = /^-?(?:\d+\.?\d*|\.\d*)(?:[eE][+-]?\d*)?$/
@@ -34,10 +35,14 @@ function toDisplayValue(value: number): string {
   return String(value)
 }
 
+function unaryExpression(operation: UnaryOperation, value: string): string {
+  return operation === 'sqrt' ? `√(${value})` : `${value}%`
+}
+
 export function Calculator({ theme, onToggleTheme }: CalculatorProps) {
   const [display, setDisplay] = useState('0')
   const [storedOperand, setStoredOperand] = useState<string | null>(null)
-  const [operation, setOperation] = useState<Operation | null>(null)
+  const [operation, setOperation] = useState<BinaryOperation | null>(null)
   const [expression, setExpression] = useState('')
   const [waitingForOperand, setWaitingForOperand] = useState(false)
   const [showingResult, setShowingResult] = useState(false)
@@ -152,7 +157,10 @@ export function Calculator({ theme, onToggleTheme }: CalculatorProps) {
     }
 
     setDisplay((current) => {
-      if (current.length <= 1 || (current.length === 2 && current.startsWith('-'))) {
+      if (
+        current.length <= 1 ||
+        (current.length === 2 && current.startsWith('-'))
+      ) {
         return '0'
       }
       return current.slice(0, -1)
@@ -162,7 +170,7 @@ export function Calculator({ theme, onToggleTheme }: CalculatorProps) {
   const requestCalculation = async (
     left: string,
     right: string,
-    selectedOperation: Operation,
+    selectedOperation: BinaryOperation,
   ): Promise<number | null> => {
     let a: number
     let b: number
@@ -196,7 +204,41 @@ export function Calculator({ theme, onToggleTheme }: CalculatorProps) {
     }
   }
 
-  const selectOperation = async (nextOperation: Operation) => {
+  const requestUnaryCalculation = async (
+    value: string,
+    selectedOperation: UnaryOperation,
+  ): Promise<number | null> => {
+    let a: number
+
+    try {
+      a = parseNumber(value)
+    } catch (validationError) {
+      setError(
+        validationError instanceof Error
+          ? validationError.message
+          : 'Enter a valid number',
+      )
+      return null
+    }
+
+    setIsLoading(true)
+    clearError()
+
+    try {
+      return await calculate({ operation: selectedOperation, a })
+    } catch (requestError) {
+      setError(
+        requestError instanceof CalculatorApiError
+          ? requestError.message
+          : 'Unable to reach the calculator service',
+      )
+      return null
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const selectOperation = async (nextOperation: BinaryOperation) => {
     if (isLoading) return
 
     clearError()
@@ -238,6 +280,95 @@ export function Calculator({ theme, onToggleTheme }: CalculatorProps) {
     setExpression(`${display} ${operationSymbols[nextOperation]}`)
     setWaitingForOperand(true)
     setShowingResult(false)
+  }
+
+  const applySquareRoot = async () => {
+    if (isLoading) return
+
+    clearError()
+
+    if (waitingForOperand) {
+      setError('Enter a number first')
+      return
+    }
+
+    const input = display
+    const result = await requestUnaryCalculation(input, 'sqrt')
+
+    if (result === null) return
+
+    const resultDisplay = toDisplayValue(result)
+    setDisplay(resultDisplay)
+    setWaitingForOperand(false)
+
+    if (operation && storedOperand !== null) {
+      setExpression(
+        `${storedOperand} ${operationSymbols[operation]} ${unaryExpression('sqrt', input)}`,
+      )
+      setShowingResult(false)
+      return
+    }
+
+    setStoredOperand(null)
+    setOperation(null)
+    setExpression(`${unaryExpression('sqrt', input)} =`)
+    setShowingResult(true)
+  }
+
+  const applyPercentage = async () => {
+    if (isLoading) return
+
+    clearError()
+
+    if (waitingForOperand) {
+      setError('Enter a number first')
+      return
+    }
+
+    const input = display
+    const percentage = await requestUnaryCalculation(input, 'percentage')
+
+    if (percentage === null) return
+
+    if (!operation || storedOperand === null) {
+      setDisplay(toDisplayValue(percentage))
+      setStoredOperand(null)
+      setOperation(null)
+      setExpression(`${unaryExpression('percentage', input)} =`)
+      setWaitingForOperand(false)
+      setShowingResult(true)
+      return
+    }
+
+    let rightOperand = percentage
+
+    if (operation === 'add' || operation === 'subtract') {
+      const percentageOfStoredOperand = await requestCalculation(
+        storedOperand,
+        toDisplayValue(percentage),
+        'multiply',
+      )
+
+      if (percentageOfStoredOperand === null) return
+      rightOperand = percentageOfStoredOperand
+    }
+
+    const result = await requestCalculation(
+      storedOperand,
+      toDisplayValue(rightOperand),
+      operation,
+    )
+
+    if (result === null) return
+
+    setDisplay(toDisplayValue(result))
+    setExpression(
+      `${storedOperand} ${operationSymbols[operation]} ${unaryExpression('percentage', input)} =`,
+    )
+    setStoredOperand(null)
+    setOperation(null)
+    setWaitingForOperand(false)
+    setShowingResult(true)
   }
 
   const handleEquals = async (event?: FormEvent<HTMLFormElement>) => {
@@ -360,6 +491,40 @@ export function Calculator({ theme, onToggleTheme }: CalculatorProps) {
         </div>
 
         <div className="keypad" aria-label="Calculator keypad">
+          <button
+            type="button"
+            className="key key-operation"
+            onClick={() => void selectOperation('power')}
+            aria-label="Power"
+            title="Exponentiation"
+          >
+            xʸ
+          </button>
+          <button
+            type="button"
+            className="key key-operation"
+            onClick={() => void applySquareRoot()}
+            aria-label="Square root"
+          >
+            √
+          </button>
+          <button
+            type="button"
+            className="key key-operation"
+            onClick={() => void applyPercentage()}
+            aria-label="Percentage"
+          >
+            %
+          </button>
+          <button
+            type="button"
+            className="key key-operation"
+            onClick={() => void selectOperation('divide')}
+            aria-label="Divide"
+          >
+            ÷
+          </button>
+
           <button type="button" className="key key-utility" onClick={clearAll}>
             AC
           </button>
@@ -377,28 +542,19 @@ export function Calculator({ theme, onToggleTheme }: CalculatorProps) {
           <button
             type="button"
             className="key key-operation"
-            onClick={() => void selectOperation('divide')}
-            aria-label="Divide"
-          >
-            ÷
-          </button>
-
-          {['7', '8', '9'].map((digit) => (
-            <button key={digit} type="button" className="key" onClick={() => inputDigit(digit)}>
-              {digit}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="key key-operation"
             onClick={() => void selectOperation('multiply')}
             aria-label="Multiply"
           >
             ×
           </button>
 
-          {['4', '5', '6'].map((digit) => (
-            <button key={digit} type="button" className="key" onClick={() => inputDigit(digit)}>
+          {['7', '8', '9'].map((digit) => (
+            <button
+              key={digit}
+              type="button"
+              className="key"
+              onClick={() => inputDigit(digit)}
+            >
               {digit}
             </button>
           ))}
@@ -411,8 +567,13 @@ export function Calculator({ theme, onToggleTheme }: CalculatorProps) {
             −
           </button>
 
-          {['1', '2', '3'].map((digit) => (
-            <button key={digit} type="button" className="key" onClick={() => inputDigit(digit)}>
+          {['4', '5', '6'].map((digit) => (
+            <button
+              key={digit}
+              type="button"
+              className="key"
+              onClick={() => inputDigit(digit)}
+            >
               {digit}
             </button>
           ))}
@@ -425,14 +586,39 @@ export function Calculator({ theme, onToggleTheme }: CalculatorProps) {
             +
           </button>
 
-          <button type="button" className="key key-zero" onClick={() => inputDigit('0')}>
+          {['1', '2', '3'].map((digit) => (
+            <button
+              key={digit}
+              type="button"
+              className="key"
+              onClick={() => inputDigit(digit)}
+            >
+              {digit}
+            </button>
+          ))}
+          <button
+            type="submit"
+            className="key key-equals"
+            disabled={isLoading}
+            aria-label="Equals"
+          >
+            =
+          </button>
+
+          <button
+            type="button"
+            className="key key-zero"
+            onClick={() => inputDigit('0')}
+          >
             0
           </button>
-          <button type="button" className="key" onClick={inputDecimal} aria-label="Decimal point">
+          <button
+            type="button"
+            className="key"
+            onClick={inputDecimal}
+            aria-label="Decimal point"
+          >
             .
-          </button>
-          <button type="submit" className="key key-equals" disabled={isLoading} aria-label="Equals">
-            =
           </button>
         </div>
       </form>

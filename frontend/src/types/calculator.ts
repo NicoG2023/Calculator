@@ -1,10 +1,24 @@
-export type Operation = 'add' | 'subtract' | 'multiply' | 'divide'
+export type BinaryOperation =
+  | 'add'
+  | 'subtract'
+  | 'multiply'
+  | 'divide'
+  | 'power'
 
-export interface CalculateRequest {
-  operation: Operation
-  a: number
-  b: number
-}
+export type UnaryOperation = 'sqrt' | 'percentage'
+
+export type Operation = BinaryOperation | UnaryOperation
+
+export type CalculateRequest =
+  | {
+      operation: BinaryOperation
+      a: number
+      b: number
+    }
+  | {
+      operation: UnaryOperation
+      a: number
+    }
 
 export interface CalculateResponse {
   result: number

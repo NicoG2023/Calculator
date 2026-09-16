@@ -1,0 +1,30 @@
+# Frontend
+node_modules/
+dist/
+coverage/
+
+# Go
+bin/
+*.out
+*.test
+coverage.out
+coverage.html
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
